@@ -1,0 +1,1 @@
+{"id":"evt-102","type":"matchmaking.matched","ts":"2026-01-01T00:00:00Z","correlation_id":"corr-102","payload":{"match_id":"m-1","user_ids":["u1","u2"],"new_payload_field":true}}

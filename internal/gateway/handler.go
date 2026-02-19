@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 )
@@ -55,18 +56,18 @@ func NewSender(instanceID string, logger zerolog.Logger, redisClient *redis.Clie
 func (s *userSender) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/ws", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 			return
 		}
 
 		token := strings.TrimSpace(r.URL.Query().Get("token"))
 		if token == "" {
-			http.Error(w, "missing token", http.StatusUnauthorized)
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "missing token")
 			return
 		}
 		userID, _, err := s.parser.ParseToken(token)
 		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "invalid token")
 			return
 		}
 
@@ -80,24 +81,24 @@ func (s *userSender) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("/v1/send", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 			return
 		}
 		var req SendRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid json", http.StatusBadRequest)
+			apierror.Write(w, http.StatusBadRequest, "invalid_json", "invalid json")
 			return
 		}
 		if req.UserID == "" || len(req.Message) == 0 {
-			http.Error(w, "user_id and message are required", http.StatusBadRequest)
+			apierror.Write(w, http.StatusBadRequest, "validation_failed", "user_id and message are required")
 			return
 		}
 		if err := s.SendToUser(req.UserID, req.Message); err != nil {
 			if errors.Is(err, ErrUserNotConnected) {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				apierror.Write(w, http.StatusNotFound, "not_connected", err.Error())
 				return
 			}
-			http.Error(w, "failed to send message", http.StatusInternalServerError)
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", "failed to send message")
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)

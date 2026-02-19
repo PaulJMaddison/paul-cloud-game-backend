@@ -1,0 +1,2 @@
+-- placeholder init migration for paul-cloud-game-backend
+-- Add tables in later Codex prompts (users, sessions, etc.)

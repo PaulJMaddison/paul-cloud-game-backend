@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 type fakeService struct {
@@ -30,36 +32,48 @@ func (f fakeService) ParseToken(string) (string, string, error) {
 	return "u1", "alice", nil
 }
 
-func TestHandleLoginSuccess(t *testing.T) {
-	h := NewHandler(fakeService{loginResp: LoginResponse{Token: "jwt", User: UserProfile{ID: "u1", Username: "alice", CreatedAt: time.Now().UTC()}}})
-	mux := http.NewServeMux()
-	h.Register(mux)
-
-	body, _ := json.Marshal(LoginRequest{Username: "alice", Password: "password123"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/login", bytes.NewReader(body))
-	res := httptest.NewRecorder()
-	mux.ServeHTTP(res, req)
-
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected 200 got %d", res.Code)
+func TestLoginHandler(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		svc  fakeService
+		body string
+		code int
+		err  string
+	}{
+		{name: "success", svc: fakeService{loginResp: LoginResponse{Token: "jwt", User: UserProfile{ID: "u1", Username: "alice", CreatedAt: time.Now().UTC()}}}, body: `{"username":"alice","password":"password123"}`, code: http.StatusOK},
+		{name: "bad json", svc: fakeService{}, body: `{`, code: http.StatusBadRequest, err: "invalid_json"},
+		{name: "validation", svc: fakeService{}, body: `{"username":"ab","password":"short"}`, code: http.StatusBadRequest, err: "validation_failed"},
+		{name: "auth failure", svc: fakeService{loginErr: ErrInvalidCredentials}, body: `{"username":"alice","password":"password123"}`, code: http.StatusUnauthorized, err: "invalid_credentials"},
 	}
-}
-
-func TestHandleLoginValidation(t *testing.T) {
-	h := NewHandler(fakeService{})
-	mux := http.NewServeMux()
-	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/login", bytes.NewBufferString(`{"username":"ab","password":"short"}`))
-	res := httptest.NewRecorder()
-	mux.ServeHTTP(res, req)
-
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 got %d", res.Code)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := NewHandler(tc.svc)
+			mux := http.NewServeMux()
+			h.Register(mux)
+			req := httptest.NewRequest(http.MethodPost, "/v1/login", bytes.NewBufferString(tc.body))
+			res := httptest.NewRecorder()
+			mux.ServeHTTP(res, req)
+			if res.Code != tc.code {
+				t.Fatalf("expected %d got %d", tc.code, res.Code)
+			}
+			if tc.err != "" {
+				var e apierror.Response
+				if err := json.Unmarshal(res.Body.Bytes(), &e); err != nil {
+					t.Fatalf("decode error response: %v", err)
+				}
+				if e.Code != tc.err {
+					t.Fatalf("expected code %s got %s", tc.err, e.Code)
+				}
+			}
+		})
 	}
 }
 
 func TestHandleMeUnauthorized(t *testing.T) {
+	t.Parallel()
 	h := NewHandler(fakeService{parseErr: errors.New("bad")})
 	mux := http.NewServeMux()
 	h.Register(mux)
@@ -71,5 +85,10 @@ func TestHandleMeUnauthorized(t *testing.T) {
 
 	if res.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 got %d", res.Code)
+	}
+	var e apierror.Response
+	_ = json.Unmarshal(res.Body.Bytes(), &e)
+	if e.Code != "unauthorized" {
+		t.Fatalf("unexpected error code: %s", e.Code)
 	}
 }

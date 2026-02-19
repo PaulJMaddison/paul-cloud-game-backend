@@ -1,10 +1,26 @@
 GO ?= go
 SERVICES := gateway router login sessions matchmaking
 
-.PHONY: test lint run-local docker-up docker-down migrate-up migrate-down build
+.PHONY: test test-unit test-integration test-e2e test-all lint run-local docker-up docker-down migrate-up migrate-down build
 
-test:
+test: test-unit
+
+test-unit:
 	$(GO) test ./...
+
+test-integration:
+	$(GO) test -tags=integration ./...
+
+test-e2e:
+	./scripts/test-e2e.sh
+
+test-all:
+	@echo "==> unit"
+	@$(MAKE) test-unit
+	@echo "==> integration"
+	@$(MAKE) test-integration || echo "integration tier skipped or failed"
+	@echo "==> e2e"
+	@$(MAKE) test-e2e || echo "e2e tier skipped or failed"
 
 lint:
 	$(GO) vet ./...

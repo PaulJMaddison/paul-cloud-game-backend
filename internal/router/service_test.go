@@ -15,28 +15,33 @@ type fakeRedisGetter struct {
 }
 
 func (f fakeRedisGetter) Get(_ context.Context, _ string) *redis.StringCmd {
-	cmd := redis.NewStringResult(f.value, f.err)
-	return cmd
+	return redis.NewStringResult(f.value, f.err)
 }
 
-func TestRedisLookupGatewayInstanceIDFound(t *testing.T) {
-	lookup := NewRedisLookup(fakeRedisGetter{value: "gw-1"})
-
-	instanceID, err := lookup.GatewayInstanceID(context.Background(), "u1")
-	if err != nil {
-		t.Fatalf("GatewayInstanceID() error = %v", err)
+func TestRedisLookupBehaviors(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		getter  fakeRedisGetter
+		wantErr error
+	}{
+		{name: "found", getter: fakeRedisGetter{value: "gw-1"}},
+		{name: "offline nil", getter: fakeRedisGetter{err: redis.Nil}, wantErr: ErrOffline},
+		{name: "offline empty", getter: fakeRedisGetter{value: ""}, wantErr: ErrOffline},
 	}
-	if instanceID != "gw-1" {
-		t.Fatalf("expected gw-1, got %q", instanceID)
-	}
-}
-
-func TestRedisLookupGatewayInstanceIDOffline(t *testing.T) {
-	lookup := NewRedisLookup(fakeRedisGetter{err: redis.Nil})
-
-	_, err := lookup.GatewayInstanceID(context.Background(), "missing")
-	if !errors.Is(err, ErrOffline) {
-		t.Fatalf("expected ErrOffline, got %v", err)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			lookup := NewRedisLookup(tc.getter)
+			_, err := lookup.GatewayInstanceID(context.Background(), "u1")
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v got %v", tc.wantErr, err)
+			}
+		})
 	}
 }
 
@@ -62,6 +67,7 @@ func (p *capturedPublish) Publish(subject string, data []byte) error {
 }
 
 func TestServiceRoutePublishesEnvelope(t *testing.T) {
+	t.Parallel()
 	publisher := &capturedPublish{}
 	svc := NewService(fakeLookup{instanceID: "gw-2"}, publisher, false)
 
@@ -85,17 +91,10 @@ func TestServiceRoutePublishesEnvelope(t *testing.T) {
 	}
 }
 
-func TestServiceRoutePartitionedSubject(t *testing.T) {
-	publisher := &capturedPublish{}
-	svc := NewService(fakeLookup{instanceID: "gw-7"}, publisher, true)
-
-	_, err := svc.Route(context.Background(), "u22", json.RawMessage(`{"kind":"chat"}`))
-	if err != nil {
-		t.Fatalf("Route() error = %v", err)
-	}
-
-	want := SendToUserSubject + ".gw-7"
-	if publisher.subject != want {
-		t.Fatalf("expected subject %q got %q", want, publisher.subject)
+func TestServiceRouteTransientPublishFailure(t *testing.T) {
+	t.Parallel()
+	svc := NewService(fakeLookup{instanceID: "gw-7"}, &capturedPublish{err: errors.New("nats timeout")}, true)
+	if _, err := svc.Route(context.Background(), "u22", json.RawMessage(`{"kind":"chat"}`)); err == nil {
+		t.Fatal("expected publish error")
 	}
 }

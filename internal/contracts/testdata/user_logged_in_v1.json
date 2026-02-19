@@ -1,0 +1,1 @@
+{"id":"evt-100","type":"user.logged_in","ts":"2026-01-01T00:00:00Z","correlation_id":"corr-100","user_id":"u-1","payload":{"auth_method":"password","unknown_field":"ignored"},"unknown_envelope":"ignored"}
