@@ -9,6 +9,12 @@ type Session struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type User struct {
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type ServerAllocation struct {
 	IP     string `json:"ip"`
 	Port   int    `json:"port"`
