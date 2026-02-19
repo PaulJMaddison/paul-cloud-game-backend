@@ -45,3 +45,6 @@ migrate-up:
 
 migrate-down:
 	POSTGRES_URL=$${POSTGRES_URL:-postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable} $(GO) run ./cmd/migrate down -steps=1
+
+local-demo:
+	./scripts/local-demo.sh

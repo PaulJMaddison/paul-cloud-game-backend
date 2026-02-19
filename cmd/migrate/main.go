@@ -202,7 +202,7 @@ func runMigration(ctx context.Context, conn *pgx.Conn, direction string, m migra
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, string(sqlBytes)); err != nil {
 		return err

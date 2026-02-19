@@ -14,3 +14,15 @@ linters-settings:
     confidence: 0.8
 issues:
   exclude-use-default: false
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+issues:
+  max-same-issues: 0
