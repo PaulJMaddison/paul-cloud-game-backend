@@ -265,3 +265,45 @@ curl -X POST http://localhost:8080/v1/send \
 ```
 
 You should see the JSON message printed in the connected `wscat` session.
+
+## Quality gates (commercial pass)
+
+Run the full local quality pass in this order:
+
+```bash
+gofmt -w $(git ls-files '*.go')
+go test ./...
+go test -tags=integration ./...
+golangci-lint run ./...
+go build ./...
+for d in cmd/*; do [ -d "$d" ] && go build "./$d"; done
+```
+
+Module hygiene:
+
+```bash
+go mod tidy
+```
+
+## Test tiers
+
+- Unit: `go test ./...`
+- Integration: `go test -tags=integration ./...`
+- E2E: `./scripts/test-e2e.sh`
+- Combined unit+integration (skip-aware when Docker is missing): `./scripts/test.sh`
+
+## Running locally
+
+1. `./scripts/env.sh`
+2. `make docker-up`
+3. `make migrate-up`
+4. Start services individually from `cmd/*` (or use `./scripts/local-demo.sh`).
+
+## Docker-unavailable environments (Codex/sandbox/limited CI)
+
+The repository intentionally **skips** Docker-dependent tiers with an explicit message instead of failing:
+
+- `./scripts/test.sh` skips integration tests when Docker CLI/daemon is unavailable.
+- `./scripts/test-e2e.sh` skips E2E when Docker CLI/daemon is unavailable.
+- `make docker-up` and `make docker-down` emit clear skip messages when Docker cannot be used.
+

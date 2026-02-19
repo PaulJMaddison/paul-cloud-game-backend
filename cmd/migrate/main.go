@@ -40,7 +40,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("connect database: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		_ = conn.Close(ctx)
+	}()
 
 	if err := ensureSchemaMigrationsTable(ctx, conn); err != nil {
 		log.Fatalf("ensure schema_migrations table: %v", err)

@@ -41,7 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			log.Printf("close postgres connection: %v", closeErr)
+		}
+	}()
 
 	nc, err := bus.Connect(cfg.NATSURL)
 	if err != nil {
@@ -57,7 +61,11 @@ func main() {
 	auth := login.NewAuthenticator(secret, 24*time.Hour)
 	repo := sessions.NewPostgresRepository(db)
 	redisClient := storage.NewRedis(cfg.RedisAddr)
-	defer redisClient.Close()
+	defer func() {
+		if closeErr := redisClient.Close(); closeErr != nil {
+			log.Printf("close redis client: %v", closeErr)
+		}
+	}()
 
 	svc := sessions.NewService(repo, auth, nc, redisClient)
 	handler := sessions.NewHandler(svc)

@@ -67,7 +67,7 @@ func (r *PostgresRepository) ListUsers(ctx context.Context) ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := make([]User, 0)
 	for rows.Next() {
@@ -89,7 +89,7 @@ func (r *PostgresRepository) ListSessions(ctx context.Context) ([]Session, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	sessions := make([]Session, 0)
 	for rows.Next() {

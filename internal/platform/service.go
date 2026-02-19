@@ -26,10 +26,18 @@ func RunBootService(serviceName string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Warn().Err(closeErr).Msg("close postgres connection")
+		}
+	}()
 
 	redisClient := storage.NewRedis(cfg.RedisAddr)
-	defer redisClient.Close()
+	defer func() {
+		if closeErr := redisClient.Close(); closeErr != nil {
+			logger.Warn().Err(closeErr).Msg("close redis client")
+		}
+	}()
 
 	natsConn, err := bus.Connect(cfg.NATSURL)
 	if err != nil {

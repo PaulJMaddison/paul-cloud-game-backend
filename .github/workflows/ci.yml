@@ -16,21 +16,21 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: go test
-        run: go test ./...
+      - name: gofmt check
+        run: |
+          if [ -n "$(gofmt -l $(git ls-files '*.go'))" ]; then
+            echo "Go files are not properly formatted" >&2
+            gofmt -l $(git ls-files '*.go')
+            exit 1
+          fi
 
-      - name: go vet
-        run: go vet ./...
+      - name: unit and integration tests (skip-aware)
+        run: ./scripts/test.sh
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.60.3
 
-      - name: build cmd binaries
-        run: |
-          for d in cmd/*; do
-            [ -d "$d" ] || continue
-            echo "building $d"
-            go build "./$d"
-          done
+      - name: go build all packages and cmd binaries
+        run: make build

@@ -37,7 +37,11 @@ func main() {
 	}
 
 	redisClient := storage.NewRedis(cfg.RedisAddr)
-	defer redisClient.Close()
+	defer func() {
+		if closeErr := redisClient.Close(); closeErr != nil {
+			log.Printf("close redis client: %v", closeErr)
+		}
+	}()
 
 	nc, err := bus.Connect(cfg.NATSURL)
 	if err != nil {
