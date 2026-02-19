@@ -17,7 +17,7 @@ func TestMarshalUnmarshalAndDecodeV1(t *testing.T) {
 		{name: "session created", eventType: EventSessionCreated, payload: SessionCreatedV1{SessionID: "s-1"}},
 		{name: "session assigned", eventType: EventSessionAssigned, payload: SessionAssignedServerV1{SessionID: "s-1", ServerID: "srv-1"}},
 		{name: "matchmaking enqueued", eventType: EventMatchmakingEnqueued, payload: MatchmakingEnqueuedV1{TicketID: "t-1", Queue: "ranked"}},
-		{name: "matchmaking matched", eventType: EventMatchmakingMatched, payload: MatchmakingMatchedV1{MatchID: "m-1", SessionIDs: []string{"s-1", "s-2"}}},
+		{name: "matchmaking matched", eventType: EventMatchmakingMatched, payload: MatchmakingMatchedV1{MatchID: "m-1", UserIDs: []string{"u-1", "u-2"}}},
 		{name: "gateway send to user", eventType: EventGatewaySendToUser, payload: GatewaySendToUserV1{TargetUserID: "u-1", Message: json.RawMessage(`{"op":"notify"}`)}},
 	}
 
