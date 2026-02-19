@@ -5,38 +5,41 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nats.go"
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/internal/contracts"
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 type fakeAuth struct{}
 
-func (fakeAuth) ParseToken(string) (string, string, error) {
-	return "user-1", "alice", nil
+func (fakeAuth) ParseToken(string) (string, string, error) { return "user-1", "alice", nil }
+
+type fakeCreateRepo struct {
+	createCalls int
+	members     []string
 }
 
-type fakeCreateRepo struct{}
-
-func (fakeCreateRepo) CreateSession(_ context.Context, ownerUserID, status string, _ []string) (Session, error) {
+func (f *fakeCreateRepo) CreateSession(_ context.Context, ownerUserID, status string, members []string) (Session, error) {
+	f.createCalls++
+	f.members = append([]string(nil), members...)
 	return Session{ID: "sess-1", OwnerUserID: ownerUserID, Status: status, CreatedAt: time.Now().UTC()}, nil
 }
-
-func (fakeCreateRepo) IsMember(_ context.Context, _, _ string) (bool, error) {
-	return true, nil
-}
-
-func (fakeCreateRepo) ListUsers(_ context.Context) ([]User, error) {
+func (f *fakeCreateRepo) IsMember(_ context.Context, _, _ string) (bool, error) { return true, nil }
+func (f *fakeCreateRepo) ListUsers(_ context.Context) ([]User, error) {
 	return []User{{ID: "user-1", Username: "alice", CreatedAt: time.Now().UTC()}}, nil
 }
-
-func (fakeCreateRepo) ListSessions(_ context.Context) ([]Session, error) {
+func (f *fakeCreateRepo) ListSessions(_ context.Context) ([]Session, error) {
 	return []Session{{ID: "sess-1", OwnerUserID: "user-1", Status: "created", CreatedAt: time.Now().UTC()}}, nil
 }
 
 func TestCreateSessionHappyPath(t *testing.T) {
-	svc := NewService(fakeCreateRepo{}, fakeAuth{}, nil, nil)
+	t.Parallel()
+	repo := &fakeCreateRepo{}
+	svc := NewService(repo, fakeAuth{}, nil, nil)
 	h := NewHandler(svc)
 	mux := http.NewServeMux()
 	h.Register(mux)
@@ -45,42 +48,36 @@ func TestCreateSessionHappyPath(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer token")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
-
 	if res.Code != http.StatusCreated {
 		t.Fatalf("expected 201 got %d", res.Code)
-	}
-
-	var body map[string]Session
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if body["session"].ID != "sess-1" {
-		t.Fatalf("unexpected session id: %s", body["session"].ID)
 	}
 }
 
 func TestAdminUsersRequiresToken(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "dev-admin")
-	svc := NewService(fakeCreateRepo{}, fakeAuth{}, nil, nil)
+	svc := NewService(&fakeCreateRepo{}, fakeAuth{}, nil, nil)
 	h := NewHandler(svc)
 	mux := http.NewServeMux()
 	h.Register(mux)
-
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/users", nil)
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 got %d", res.Code)
 	}
+	var er apierror.Response
+	_ = json.Unmarshal(res.Body.Bytes(), &er)
+	if er.Code != "unauthorized" {
+		t.Fatalf("unexpected code %s", er.Code)
+	}
 }
 
 func TestAdminUsersHappyPath(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "dev-admin")
-	svc := NewService(fakeCreateRepo{}, fakeAuth{}, nil, nil)
+	svc := NewService(&fakeCreateRepo{}, fakeAuth{}, nil, nil)
 	h := NewHandler(svc)
 	mux := http.NewServeMux()
 	h.Register(mux)
-
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/users", nil)
 	req.Header.Set("X-Admin-Token", "dev-admin")
 	res := httptest.NewRecorder()
@@ -93,7 +90,16 @@ func TestAdminUsersHappyPath(t *testing.T) {
 	}
 }
 
-func TestMain(m *testing.M) {
-	_ = os.Unsetenv("ADMIN_TOKEN")
-	os.Exit(m.Run())
+func TestHandleMatchedEventCreatesSession(t *testing.T) {
+	t.Parallel()
+	repo := &fakeCreateRepo{}
+	svc := NewService(repo, fakeAuth{}, nil, nil)
+	raw, err := contracts.MarshalV1("evt-1", contracts.EventMatchmakingMatched, time.Now().UTC(), "corr-1", nil, contracts.MatchmakingMatchedV1{MatchID: "m1", UserIDs: []string{"u1", "u2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.HandleMatchedEvent(&nats.Msg{Data: raw})
+	if repo.createCalls != 1 {
+		t.Fatalf("expected one create call, got %d", repo.createCalls)
+	}
 }

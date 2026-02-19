@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
@@ -29,17 +31,17 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		apierror.Write(w, http.StatusBadRequest, "invalid_json", "invalid json")
 		return
 	}
 	if err := req.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		apierror.Write(w, http.StatusBadRequest, "validation_failed", err.Error())
 		return
 	}
 
@@ -47,7 +49,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if correlationID == "" {
 		generatedID, err := newUUID()
 		if err != nil {
-			http.Error(w, "could not create correlation id", http.StatusInternalServerError)
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", "could not create correlation id")
 			return
 		}
 		correlationID = generatedID
@@ -55,10 +57,12 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.svc.Login(r.Context(), req, correlationID)
 	if err != nil {
 		status := http.StatusInternalServerError
+		code := "internal_error"
 		if errors.Is(err, ErrInvalidCredentials) {
 			status = http.StatusUnauthorized
+			code = "invalid_credentials"
 		}
-		http.Error(w, err.Error(), status)
+		apierror.Write(w, status, code, err.Error())
 		return
 	}
 
@@ -67,25 +71,25 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 
 	auth := r.Header.Get("Authorization")
 	if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
-		http.Error(w, "missing bearer token", http.StatusUnauthorized)
+		apierror.Write(w, http.StatusUnauthorized, "unauthorized", "missing bearer token")
 		return
 	}
 	token := strings.TrimPrefix(auth, "Bearer ")
 	userID, _, err := h.svc.ParseToken(token)
 	if err != nil {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
+		apierror.Write(w, http.StatusUnauthorized, "unauthorized", "invalid token")
 		return
 	}
 
 	user, err := h.svc.Me(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		apierror.Write(w, http.StatusUnauthorized, "unauthorized", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, MeResponse{User: user})

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 type TokenParser interface {
@@ -26,12 +28,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 func (h *Handler) handleEnqueue(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	userID, ok := h.userIDFromAuth(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 		return
 	}
 
@@ -39,13 +41,13 @@ func (h *Handler) handleEnqueue(w http.ResponseWriter, r *http.Request) {
 	if correlationID == "" {
 		id, err := h.newID()
 		if err != nil {
-			http.Error(w, "could not create correlation id", http.StatusInternalServerError)
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", "could not create correlation id")
 			return
 		}
 		correlationID = id
 	}
 	if err := h.svc.Enqueue(r.Context(), userID, correlationID); err != nil {
-		http.Error(w, "enqueue failed", http.StatusInternalServerError)
+		apierror.Write(w, http.StatusInternalServerError, "internal_error", "enqueue failed")
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued"})

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 type Router interface {
@@ -33,31 +35,31 @@ type RouteResponse struct {
 
 func (h *Handler) handleRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		apierror.Write(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 
 	var req RouteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		apierror.Write(w, http.StatusBadRequest, "invalid_json", "invalid json")
 		return
 	}
 	if req.UserID == "" {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
+		apierror.Write(w, http.StatusBadRequest, "validation_failed", "user_id is required")
 		return
 	}
 	if len(req.Message) == 0 {
-		http.Error(w, "message is required", http.StatusBadRequest)
+		apierror.Write(w, http.StatusBadRequest, "validation_failed", "message is required")
 		return
 	}
 
 	gatewayInstanceID, err := h.router.Route(r.Context(), req.UserID, req.Message)
 	if err != nil {
 		if errors.Is(err, ErrOffline) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "offline"})
+			apierror.Write(w, http.StatusNotFound, "offline", "offline")
 			return
 		}
-		http.Error(w, "failed to route message", http.StatusInternalServerError)
+		apierror.Write(w, http.StatusInternalServerError, "internal_error", "failed to route message")
 		return
 	}
 

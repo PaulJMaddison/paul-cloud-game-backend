@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/apierror"
 )
 
 type fakeRouter struct {
@@ -19,44 +21,40 @@ func (f fakeRouter) Route(context.Context, string, json.RawMessage) (string, err
 	return f.instanceID, f.err
 }
 
-func TestHandleRouteAccepted(t *testing.T) {
-	h := NewHandler(fakeRouter{instanceID: "gw-1"})
-	mux := http.NewServeMux()
-	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/route", bytes.NewBufferString(`{"user_id":"u1","message":{"type":"ping"}}`))
-	res := httptest.NewRecorder()
-	mux.ServeHTTP(res, req)
-
-	if res.Code != http.StatusAccepted {
-		t.Fatalf("expected 202 got %d", res.Code)
+func TestHandleRoute(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		body    string
+		r       fakeRouter
+		code    int
+		errCode string
+	}{
+		{"accepted", `{"user_id":"u1","message":{"type":"ping"}}`, fakeRouter{instanceID: "gw-1"}, http.StatusAccepted, ""},
+		{"offline", `{"user_id":"u1","message":{"type":"ping"}}`, fakeRouter{err: ErrOffline}, http.StatusNotFound, "offline"},
+		{"badrequest", `{"message":{"type":"ping"}}`, fakeRouter{}, http.StatusBadRequest, "validation_failed"},
+		{"internal", `{"user_id":"u1","message":{"type":"ping"}}`, fakeRouter{err: errors.New("boom")}, http.StatusInternalServerError, "internal_error"},
 	}
-}
-
-func TestHandleRouteOffline(t *testing.T) {
-	h := NewHandler(fakeRouter{err: ErrOffline})
-	mux := http.NewServeMux()
-	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/route", bytes.NewBufferString(`{"user_id":"u1","message":{"type":"ping"}}`))
-	res := httptest.NewRecorder()
-	mux.ServeHTTP(res, req)
-
-	if res.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 got %d", res.Code)
-	}
-}
-
-func TestHandleRouteBadRequest(t *testing.T) {
-	h := NewHandler(fakeRouter{err: errors.New("should not be called")})
-	mux := http.NewServeMux()
-	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/route", bytes.NewBufferString(`{"message":{"type":"ping"}}`))
-	res := httptest.NewRecorder()
-	mux.ServeHTTP(res, req)
-
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 got %d", res.Code)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := NewHandler(tc.r)
+			mux := http.NewServeMux()
+			h.Register(mux)
+			req := httptest.NewRequest(http.MethodPost, "/v1/route", bytes.NewBufferString(tc.body))
+			res := httptest.NewRecorder()
+			mux.ServeHTTP(res, req)
+			if res.Code != tc.code {
+				t.Fatalf("expected %d got %d", tc.code, res.Code)
+			}
+			if tc.errCode != "" {
+				var e apierror.Response
+				_ = json.Unmarshal(res.Body.Bytes(), &e)
+				if e.Code != tc.errCode {
+					t.Fatalf("expected error code %s got %s", tc.errCode, e.Code)
+				}
+			}
+		})
 	}
 }
