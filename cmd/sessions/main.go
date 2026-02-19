@@ -15,6 +15,7 @@ import (
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/config"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/httpserver"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/logging"
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/observability"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/storage"
 )
 
@@ -25,6 +26,12 @@ func main() {
 	}
 
 	logger := logging.New(cfg.AppName, cfg.ServiceName, cfg.Env)
+
+	otelShutdown, err := observability.InitOTEL(context.Background(), cfg, logger)
+	if err != nil {
+		log.Fatalf("init otel: %v", err)
+	}
+	defer func() { _ = otelShutdown(context.Background()) }()
 	port := 8083
 	if cfg.HTTPPort != 8080 {
 		port = cfg.HTTPPort
@@ -56,7 +63,7 @@ func main() {
 		log.Fatalf("subscribe matched events: %v", err)
 	}
 
-	mux := httpserver.NewMux()
+	mux := httpserver.NewMux(cfg.ServiceName)
 	handler.Register(mux)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
