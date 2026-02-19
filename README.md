@@ -133,6 +133,37 @@ POSTGRES_URL=postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode
 - `make migrate-up`
 - `make migrate-down`
 
+
+## Dev-only admin API (sessions service)
+
+> ⚠️ **Development-only tooling**: the admin API is intended only for local/dev environments. Do not expose it publicly.
+
+The `sessions` service also exposes a token-protected admin surface:
+
+- Header required on every admin endpoint: `X-Admin-Token: <token>`
+- Token source: `ADMIN_TOKEN` env var
+
+Endpoints:
+
+- `GET /admin/v1/users`
+  - Lists all users from Postgres
+- `GET /admin/v1/sessions`
+  - Lists all sessions from Postgres
+- `POST /admin/v1/broadcast` with JSON body: `{"message": { ... }}`
+  - Finds online users via Redis keys pattern `pcgb:gateway:user:*`
+  - Publishes one `gateway.send_to_user` envelope per online user on NATS subject `pcgb.gateway.send_to_user`
+
+Example:
+
+```bash
+export ADMIN_TOKEN=dev-admin-token
+
+curl -X POST http://localhost:8083/admin/v1/broadcast \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
+  -d '{"message":{"type":"notice","text":"server restart in 5m"}}'
+```
+
 ## Gateway WebSocket usage
 
 The `gateway` service listens on `:8080` and exposes:

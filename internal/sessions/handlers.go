@@ -4,18 +4,25 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 )
 
 type Handler struct {
-	svc *Service
+	svc        *Service
+	adminToken string
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc, adminToken: os.Getenv("ADMIN_TOKEN")}
+}
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/sessions", h.handleCreateSession)
 	mux.HandleFunc("/v1/sessions/", h.handleSessionRoutes)
+	mux.HandleFunc("/admin/v1/users", h.handleAdminUsers)
+	mux.HandleFunc("/admin/v1/sessions", h.handleAdminSessions)
+	mux.HandleFunc("/admin/v1/broadcast", h.handleAdminBroadcast)
 }
 
 func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +66,85 @@ func (h *Handler) handleSessionRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !h.adminAuth(w, r) {
+		return
+	}
+	users, err := h.svc.ListUsers(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string][]User{"users": users})
+}
+
+func (h *Handler) handleAdminSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !h.adminAuth(w, r) {
+		return
+	}
+	sessions, err := h.svc.ListSessions(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string][]Session{"sessions": sessions})
+}
+
+type adminBroadcastRequest struct {
+	Message json.RawMessage `json:"message"`
+}
+
+func (h *Handler) handleAdminBroadcast(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !h.adminAuth(w, r) {
+		return
+	}
+	var req adminBroadcastRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Message) == 0 {
+		http.Error(w, "message is required", http.StatusBadRequest)
+		return
+	}
+	correlationID := r.Header.Get("X-Correlation-Id")
+	if correlationID == "" {
+		var err error
+		correlationID, err = newUUID()
+		if err != nil {
+			http.Error(w, "could not create correlation id", http.StatusInternalServerError)
+			return
+		}
+	}
+	count, err := h.svc.BroadcastToOnlineUsers(r.Context(), correlationID, req.Message)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"published": count})
+}
+
+func (h *Handler) adminAuth(w http.ResponseWriter, r *http.Request) bool {
+	token := r.Header.Get("X-Admin-Token")
+	if token == "" || h.adminToken == "" || token != h.adminToken {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
 }
 
 func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) (string, string, bool) {

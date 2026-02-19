@@ -103,8 +103,6 @@ type MatchmakingEnqueuedV1 struct {
 }
 
 type MatchmakingMatchedV1 struct {
-	MatchID string   `json:"match_id"`
-	UserIDs []string `json:"user_ids"`
 	MatchID    string   `json:"match_id"`
 	SessionIDs []string `json:"session_ids"`
 	UserIDs    []string `json:"user_ids,omitempty"`

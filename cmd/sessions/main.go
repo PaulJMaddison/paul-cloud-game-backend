@@ -49,7 +49,10 @@ func main() {
 
 	auth := login.NewAuthenticator(secret, 24*time.Hour)
 	repo := sessions.NewPostgresRepository(db)
-	svc := sessions.NewService(repo, auth, nc)
+	redisClient := storage.NewRedis(cfg.RedisAddr)
+	defer redisClient.Close()
+
+	svc := sessions.NewService(repo, auth, nc, redisClient)
 	handler := sessions.NewHandler(svc)
 
 	if _, err := nc.Subscribe(contracts.SubjectMatchmakingMatch, svc.HandleMatchedEvent); err != nil {
