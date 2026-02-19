@@ -1,7 +1,7 @@
 GO ?= go
 SERVICES := gateway router login sessions matchmaking
 
-.PHONY: test lint run-local docker-up docker-down migrate build
+.PHONY: test lint run-local docker-up docker-down migrate-up migrate-down build
 
 test:
 	$(GO) test ./...
@@ -19,10 +19,13 @@ run-local:
 	$(GO) run ./cmd/gateway
 
 docker-up:
-	docker compose -f deploy/docker-compose.yml up -d
+	docker compose --env-file .env.example -f deploy/docker-compose.yml up -d
 
 docker-down:
-	docker compose -f deploy/docker-compose.yml down
+	docker compose --env-file .env.example -f deploy/docker-compose.yml down
 
-migrate:
-	@echo "No migrations yet. Add migration tooling (goose/atlas) here."
+migrate-up:
+	POSTGRES_URL=$${POSTGRES_URL:-postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable} $(GO) run ./cmd/migrate up
+
+migrate-down:
+	POSTGRES_URL=$${POSTGRES_URL:-postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable} $(GO) run ./cmd/migrate down -steps=1

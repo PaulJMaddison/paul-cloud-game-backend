@@ -3,24 +3,83 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: pcg-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: paul_cloud_game
+      POSTGRES_DB: ${POSTGRES_DB:-paul_cloud_game}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-paul_cloud_game}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - paul-cloud-network
 
   redis:
     image: redis:7-alpine
+    container_name: pcg-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - paul-cloud-network
 
   nats:
     image: nats:2.10-alpine
+    container_name: pcg-nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"]
     ports:
       - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - natsdata:/data
+    networks:
+      - paul-cloud-network
+
+  # prometheus:
+  #   image: prom/prometheus:v2.55.1
+  #   container_name: pcg-prometheus
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   networks:
+  #     - paul-cloud-network
+
+  # grafana:
+  #   image: grafana/grafana:11.3.0
+  #   container_name: pcg-grafana
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+  #     GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+  #   networks:
+  #     - paul-cloud-network
+
+networks:
+  paul-cloud-network:
+    name: paul-cloud-network
+    driver: bridge
 
 volumes:
   pgdata:
+  redisdata:
+  natsdata:

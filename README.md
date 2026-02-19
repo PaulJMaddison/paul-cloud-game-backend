@@ -31,36 +31,48 @@ All services currently use shared bootstrap logic and expose:
 ## Requirements
 
 - Go 1.22+
-- Docker (for local Postgres/Redis/NATS)
+- Docker + Docker Compose plugin
 
 ## Local development
 
-1. Start local dependencies:
+1. Copy the sample env file and adjust values if needed:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start local dependencies:
 
    ```bash
    make docker-up
    ```
 
-2. Run a service (example: gateway):
+3. Run DB migrations:
+
+   ```bash
+   make migrate-up
+   ```
+
+4. Run a service (example: gateway):
 
    ```bash
    make run-local
    ```
 
-3. Verify health endpoint:
+5. Verify health endpoint:
 
    ```bash
    curl -i http://localhost:8080/healthz
    ```
 
-4. Run checks:
+6. Run checks:
 
    ```bash
    make test
    make lint
    ```
 
-5. Stop dependencies:
+7. Stop dependencies:
 
    ```bash
    make docker-down
@@ -68,21 +80,55 @@ All services currently use shared bootstrap logic and expose:
 
 ## Environment variables
 
-Defaults are suitable for local development:
+### App services
 
-- `APP_NAME=paul-cloud-game-backend`
-- `APP_ENV=development`
-- `PORT=8080`
-- `POSTGRES_URL=postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable`
-- `REDIS_ADDR=localhost:6379`
-- `NATS_URL=nats://localhost:4222`
-- `SHUTDOWN_TIMEOUT_SECONDS=10`
+- `APP_NAME` (default: `paul-cloud-game-backend`)
+- `APP_ENV` (default: `development`)
+- `PORT` (default: `8080`)
+- `POSTGRES_URL` (default: `postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable`)
+- `REDIS_ADDR` (default: `localhost:6379`)
+- `NATS_URL` (default: `nats://localhost:4222`)
+- `SHUTDOWN_TIMEOUT_SECONDS` (default: `10`)
+
+### Docker dependency services
+
+- `POSTGRES_DB` (default: `paul_cloud_game`)
+- `POSTGRES_USER` (default: `postgres`)
+- `POSTGRES_PASSWORD` (default: `postgres`)
+
+### Optional observability placeholders
+
+- `GRAFANA_ADMIN_USER` (default: `admin`)
+- `GRAFANA_ADMIN_PASSWORD` (default: `admin`)
+
+## Database migrations
+
+Migrations live in `deploy/sql/migrations` using paired files:
+
+- `<version>.up.sql`
+- `<version>.down.sql`
+
+Run migrations with:
+
+```bash
+make migrate-up
+make migrate-down
+```
+
+You can also call the migration command directly:
+
+```bash
+POSTGRES_URL=postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable go run ./cmd/migrate up
+POSTGRES_URL=postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable go run ./cmd/migrate down -steps=1
+```
 
 ## Make targets
 
 - `make test`
 - `make lint`
+- `make build`
 - `make run-local`
 - `make docker-up`
 - `make docker-down`
-- `make migrate`
+- `make migrate-up`
+- `make migrate-down`
