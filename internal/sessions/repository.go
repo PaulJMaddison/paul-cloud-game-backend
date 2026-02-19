@@ -29,7 +29,7 @@ func (r *PostgresRepository) CreateSession(ctx context.Context, ownerUserID, sta
 	if err != nil {
 		return Session{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const qInsertSession = `INSERT INTO sessions (id, owner_user_id, status) VALUES ($1, $2, $3) RETURNING id::text, owner_user_id::text, status, created_at`
 	var out Session

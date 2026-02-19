@@ -1,7 +1,7 @@
 GO ?= go
 SERVICES := gateway router login sessions matchmaking
 
-.PHONY: test lint run-local docker-up docker-down migrate-up migrate-down build
+.PHONY: test lint run-local local-demo docker-up docker-down migrate-up migrate-down build
 
 test:
 	$(GO) test ./...
@@ -29,3 +29,6 @@ migrate-up:
 
 migrate-down:
 	POSTGRES_URL=$${POSTGRES_URL:-postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable} $(GO) run ./cmd/migrate down -steps=1
+
+local-demo:
+	./scripts/local-demo.sh

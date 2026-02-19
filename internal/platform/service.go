@@ -40,6 +40,6 @@ func RunBootService(serviceName string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mux := httpserver.NewMux()
+	mux := httpserver.NewMux(cfg.ServiceName)
 	return httpserver.Run(ctx, logger, cfg.HTTPPort, mux, cfg.ShutdownTimeout)
 }

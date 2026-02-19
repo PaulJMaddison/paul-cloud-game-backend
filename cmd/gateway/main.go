@@ -17,6 +17,7 @@ import (
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/config"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/httpserver"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/logging"
+	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/observability"
 	"github.com/paul-cloud-game-backend/paul-cloud-game-backend/pkg/storage"
 )
 
@@ -27,6 +28,12 @@ func main() {
 	}
 
 	logger := logging.New(cfg.AppName, cfg.ServiceName, cfg.Env)
+
+	otelShutdown, err := observability.InitOTEL(context.Background(), cfg, logger)
+	if err != nil {
+		log.Fatalf("init otel: %v", err)
+	}
+	defer func() { _ = otelShutdown(context.Background()) }()
 
 	redisClient := storage.NewRedis(cfg.RedisAddr)
 	defer redisClient.Close()
@@ -60,7 +67,7 @@ func main() {
 	}
 	defer func() { _ = sub.Unsubscribe() }()
 
-	mux := httpserver.NewMux()
+	mux := httpserver.NewMux(cfg.ServiceName)
 	sender.Register(mux)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
