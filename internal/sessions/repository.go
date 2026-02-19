@@ -8,6 +8,8 @@ import (
 type Repository interface {
 	CreateSession(ctx context.Context, ownerUserID, status string, members []string) (Session, error)
 	IsMember(ctx context.Context, sessionID, userID string) (bool, error)
+	ListUsers(ctx context.Context) ([]User, error)
+	ListSessions(ctx context.Context) ([]Session, error)
 }
 
 type PostgresRepository struct {
@@ -57,4 +59,48 @@ func (r *PostgresRepository) IsMember(ctx context.Context, sessionID, userID str
 	var exists bool
 	err := r.db.QueryRowContext(ctx, q, sessionID, userID).Scan(&exists)
 	return exists, err
+}
+
+func (r *PostgresRepository) ListUsers(ctx context.Context) ([]User, error) {
+	const q = `SELECT id::text, username, created_at FROM users ORDER BY created_at DESC`
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.Username, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (r *PostgresRepository) ListSessions(ctx context.Context) ([]Session, error) {
+	const q = `SELECT id::text, owner_user_id::text, status, created_at FROM sessions ORDER BY created_at DESC`
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sessions := make([]Session, 0)
+	for rows.Next() {
+		var session Session
+		if err := rows.Scan(&session.ID, &session.OwnerUserID, &session.Status, &session.CreatedAt); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return sessions, nil
 }
