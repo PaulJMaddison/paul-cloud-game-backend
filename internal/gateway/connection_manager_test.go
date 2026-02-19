@@ -19,10 +19,10 @@ func TestSendToUserOffline(t *testing.T) {
 func TestSendToUserOnlineAndConcurrent(t *testing.T) {
 	t.Parallel()
 	server, client := net.Pipe()
-	defer server.Close()
-	defer client.Close()
+	defer func() { _ = server.Close() }()
+	defer func() { _ = client.Close() }()
 
-	go io.Copy(io.Discard, server)
+	go func() { _, _ = io.Copy(io.Discard, server) }()
 	ws := &wsConn{netConn: client}
 	s := &userSender{conns: map[string]*clientConn{"u1": {conn: ws}}}
 

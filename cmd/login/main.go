@@ -39,7 +39,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			log.Printf("close postgres connection: %v", closeErr)
+		}
+	}()
 
 	nc, err := bus.Connect(cfg.NATSURL)
 	if err != nil {

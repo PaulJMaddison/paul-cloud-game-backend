@@ -4,7 +4,21 @@
 
 - Unit: `go test ./...`
 - Integration: `go test -tags=integration ./...`
-- E2E: `make test-e2e`
+- E2E: `./scripts/test-e2e.sh`
+
+## Full quality pass (recommended)
+
+Run these in order:
+
+```bash
+gofmt -w $(git ls-files '*.go')
+go test ./...
+go test -tags=integration ./...
+golangci-lint run ./...
+go build ./...
+for d in cmd/*; do [ -d "$d" ] && go build "./$d"; done
+go mod tidy
+```
 
 ## Environment variables
 
@@ -15,13 +29,15 @@
 
 ## Dependency availability and skips
 
-Integration/E2E tests detect Docker using `docker info`.
+Integration and E2E tests are Docker-dependent.
 
-When Docker is unavailable (sandboxed CI/workstation), integration and E2E suites are **skipped with explicit messages** instead of failing.
+- `./scripts/test.sh` runs unit tests first, then integration tests only when Docker is available.
+- `./scripts/test-e2e.sh` runs E2E only when Docker is available.
+- When Docker is unavailable (sandboxed CI/workstation), those scripts **skip with explicit messages** and exit successfully.
 
 ## CI recommendations
 
-1. Run `make test-unit` on every PR.
-2. Run `make test-integration` in Docker-enabled CI workers.
-3. Run `make test-e2e` in Docker-enabled CI workers.
-4. Use `make test-all` to execute tiers in order with skip-aware behavior.
+1. Run `./scripts/test.sh` on every PR.
+2. Run `golangci-lint run ./...` on every PR.
+3. Run `make build` on every PR.
+4. Keep a Docker-enabled CI lane for full integration and e2e reliability checks.

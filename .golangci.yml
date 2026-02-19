@@ -1,28 +1,22 @@
 run:
   timeout: 3m
-linters:
-  enable:
-    - govet
-    - staticcheck
-    - errcheck
-    - ineffassign
-    - gofmt
-    - goimports
-    - revive
-linters-settings:
-  revive:
-    confidence: 0.8
-issues:
-  exclude-use-default: false
 
 linters:
   disable-all: true
   enable:
     - errcheck
+    - gofmt
+    - goimports
     - govet
     - ineffassign
+    - revive
     - staticcheck
     - unused
 
+linters-settings:
+  revive:
+    confidence: 0.8
+
 issues:
+  exclude-use-default: false
   max-same-issues: 0
