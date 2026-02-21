@@ -1,309 +1,115 @@
 # paul-cloud-game-backend
 
-Go monorepo for backend services powering `paul-cloud-game-backend`.
+**Production-Inspired, Event-Driven Multiplayer Game Backend in Go**
 
-## Services
+## 🚀 What This Project Is
 
-Each service builds and runs as a separate binary under `/cmd`:
+`paul-cloud-game-backend` is a ready-to-run backend template for teams that want to build and validate multiplayer game features quickly, without inventing backend fundamentals from scratch.
 
-- `gateway`: edge HTTP entrypoint + WebSocket sessions
-- `router`: internal request routing layer
-- `login`: authentication/login flows
-- `sessions`: session lifecycle management
-- `matchmaking`: matchmaking orchestration
+It is designed for:
+- multiplayer prototypes
+- live-ops experimentation
+- session-based games
+- matchmaking systems
 
-All services expose:
+At its core, the platform combines:
+- an event-driven architecture for service-to-service coordination
+- real-time gateway routing for connected players
+- session orchestration across services
+- a local-first development workflow so you can test complete flows on your own machine
 
-- `GET /healthz` -> `200 ok`
-- `GET /readyz` -> `200 ready`
-- `GET /metrics` -> Prometheus text format counters/gauges placeholder
+## 🎮 Why Use paul-cloud-game-backend?
 
-## Observability
+- Avoid rebuilding auth, sessions, and matchmaking plumbing from zero.
+- Prototype multiplayer features locally without cloud lock-in.
+- Use production-inspired patterns (gateway + routing + event bus) early.
+- Test real-time player flows end-to-end on a laptop before deployment.
+- Start local now, then evolve toward Kubernetes or managed cloud later.
+- Great fit for indie studios, technical designers, and backend learning projects.
 
-### Structured logging
+## 🧩 What Problems It Solves
 
-All HTTP services use structured `zerolog` request logs with:
+Multiplayer backends are less about one API and more about coordinating player state across services in real time. This project gives you that foundation by handling:
 
-- `request_id` (from `X-Request-Id` or generated)
-- `correlation_id` (when `X-Correlation-Id` header is present)
-- `method`, `path`, `status`, `duration`
+- **Player session lifecycle**: login, session creation, and session-aware service interactions.
+- **Real-time client messaging**: persistent WebSocket connections through a gateway service.
+- **Matchmaking flows**: enqueueing players and emitting match events.
+- **Outbound user routing**: delivering server-generated messages to the right connected users.
+- **Event-driven orchestration**: pub/sub workflows between backend services.
 
-### Metrics endpoint placeholder
+## 🏗️ Architecture Overview
 
-`/metrics` now emits minimal Prometheus-style metrics:
+The system is split into focused services you can run and scale independently:
 
-- `pcgb_http_requests_total`
-- `pcgb_http_requests_all_total`
-- `pcgb_process_uptime_seconds`
+- **Gateway Service**: HTTP edge + WebSocket entrypoint for real-time clients.
+- **Login Service**: authentication/login flows.
+- **Sessions Service**: session lifecycle and session-oriented operations.
+- **Matchmaking Service**: queue + match orchestration workflows.
+- **Routing Service**: internal routing layer for backend-to-backend messaging.
 
-### OpenTelemetry scaffolding
+Supporting infrastructure:
+- **NATS** for event transport
+- **Redis** for low-latency state/cache patterns
+- **Postgres** for durable relational data
 
-OpenTelemetry bootstrap is wired in as optional scaffolding and is off by default.
+## ⚡ Local-First Developer Experience
 
-- `ENABLE_OTEL=false` (default)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` (optional endpoint for future exporter wiring)
+- Docker-based infrastructure dependencies.
+- Bring up infra and services locally in minutes.
+- Full test tiers available (unit + integration + e2e).
+- Simulate realistic multiplayer flows end-to-end without cloud deployment.
 
-> Current behavior: when enabled, the services log that OTEL scaffolding mode is active.
+## 🛠️ Use Cases
 
-## Shared packages
+- Session-based multiplayer games
+- Lobby and party systems
+- PvP matchmaking prototypes
+- Backend learning / portfolio projects
+- Live-ops feature prototyping and validation
 
-- `pkg/config`: environment variable parsing and defaults
-- `pkg/logging`: zerolog logger configured with app/service/env metadata
-- `pkg/httpserver`: server helpers, diagnostics endpoints, request logging middleware
-- `pkg/observability`: optional OTEL initialization scaffold
-- `pkg/storage`: `database/sql` setup with pgx + Redis client
-- `pkg/bus`: NATS connection helper and event subjects
+## 📈 Designed for Production-Style Scaling
 
-## Requirements
+This template is intentionally built with patterns that can grow with your project:
 
-- Go 1.22+
-- Docker + Docker Compose plugin
-- `wscat` (or equivalent) for WebSocket demo
+- Event bus abstraction for asynchronous workflows
+- Gateway-centric routing model for real-time player delivery
+- Service boundaries that support stateless scaling strategies
+- Architecture that can be adapted to Kafka / Kubernetes style deployments later
 
-## Local development
+## 🚦 Getting Started
 
-1. Copy the sample env file and adjust values if needed:
+```bash
+# 1) Clone
+git clone <your-fork-or-repo-url>
+cd paul-cloud-game-backend
 
-   ```bash
-   cp .env.example .env
-   ```
+# 2) Setup
+cp .env.example .env
 
-2. Start local dependencies:
+# 3) Run infra
+make docker-up
+make migrate-up
 
-   ```bash
-   make docker-up
-   ```
+# 4) Run services (single service example)
+make run-local
 
-3. Run DB migrations:
+# 5) Run tests
+make test
+make lint
+```
 
-   ```bash
-   make migrate-up
-   ```
-
-4. Run a service (example: gateway):
-
-   ```bash
-   make run-local
-   ```
-
-5. Verify health endpoint:
-
-   ```bash
-   curl -i http://localhost:8080/healthz
-   ```
-
-6. Run checks:
-
-   ```bash
-   make test
-   make lint
-   ```
-
-7. Stop dependencies:
-
-   ```bash
-   make docker-down
-   ```
-
-## Local demo (end-to-end)
-
-### Start infra + migrations + all services
+For a full local end-to-end demo (infra + all services), run:
 
 ```bash
 scripts/local-demo.sh
 ```
 
-This script performs:
+## 🤝 Contributing / Extending
 
-- `make docker-up`
-- `make migrate-up`
-- starts `gateway`, `login`, `router`, `sessions`, `matchmaking`
+This repository is intended to be an extensible backend foundation, not a fixed product. You can add game-specific domains (inventory, progression, parties, tournaments, live-ops controls) while keeping the same event-driven, service-oriented backbone.
 
-### Sample flow: login -> connect WebSocket -> enqueue matchmaking -> receive match_found
-
-Create two demo users and get tokens:
-
-```bash
-ALICE_LOGIN=$(curl -s -X POST http://localhost:8081/v1/login \
-  -H 'Content-Type: application/json' \
-  -H 'X-Correlation-Id: demo-alice-login' \
-  -d '{"username":"alice","password":"demo-pass"}')
-
-BOB_LOGIN=$(curl -s -X POST http://localhost:8081/v1/login \
-  -H 'Content-Type: application/json' \
-  -H 'X-Correlation-Id: demo-bob-login' \
-  -d '{"username":"bob","password":"demo-pass"}')
-
-ALICE_TOKEN=$(echo "$ALICE_LOGIN" | sed -E 's/.*"token":"([^"]+)".*/\1/')
-BOB_TOKEN=$(echo "$BOB_LOGIN" | sed -E 's/.*"token":"([^"]+)".*/\1/')
-```
-
-Connect both users to gateway WS in separate terminals:
-
-```bash
-wscat -c "ws://localhost:8080/v1/ws?token=${ALICE_TOKEN}"
-wscat -c "ws://localhost:8080/v1/ws?token=${BOB_TOKEN}"
-```
-
-Enqueue both users for matchmaking:
-
-```bash
-curl -i -X POST http://localhost:8084/v1/matchmaking/enqueue \
-  -H "Authorization: Bearer ${ALICE_TOKEN}" \
-  -H 'X-Correlation-Id: demo-mm-alice'
-
-curl -i -X POST http://localhost:8084/v1/matchmaking/enqueue \
-  -H "Authorization: Bearer ${BOB_TOKEN}" \
-  -H 'X-Correlation-Id: demo-mm-bob'
-```
-
-Within a few seconds, both WS clients should receive a message like:
-
-```json
-{"type":"match_found","match_id":"<uuid>","other_user_id":"<user-id>"}
-```
-
-## Environment variables
-
-### App services
-
-- `APP_NAME` (default: `paul-cloud-game-backend`)
-- `APP_ENV` (default: `development`)
-- `PORT` (default: `8080`)
-- `POSTGRES_URL` (default: `postgres://postgres:postgres@localhost:5432/paul_cloud_game?sslmode=disable`)
-- `REDIS_ADDR` (default: `localhost:6379`)
-- `NATS_URL` (default: `nats://localhost:4222`)
-- `SHUTDOWN_TIMEOUT_SECONDS` (default: `10`)
-- `ENABLE_OTEL` (default: `false`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` (default: empty)
-
-### Docker dependency services
-
-- `POSTGRES_DB` (default: `paul_cloud_game`)
-- `POSTGRES_USER` (default: `postgres`)
-- `POSTGRES_PASSWORD` (default: `postgres`)
-
-## Database migrations
-
-Migrations live in `deploy/sql/migrations` using paired files:
-
-- `<version>.up.sql`
-- `<version>.down.sql`
-
-Run migrations with:
-
-```bash
-make migrate-up
-make migrate-down
-```
-
-## Make targets
-
-- `make test`
-- `make lint`
-- `make build`
-- `make run-local`
-- `make docker-up`
-- `make docker-down`
-- `make migrate-up`
-- `make migrate-down`
-
-
-## Dev-only admin API (sessions service)
-
-> ⚠️ **Development-only tooling**: the admin API is intended only for local/dev environments. Do not expose it publicly.
-
-The `sessions` service also exposes a token-protected admin surface:
-
-- Header required on every admin endpoint: `X-Admin-Token: <token>`
-- Token source: `ADMIN_TOKEN` env var
-
-Endpoints:
-
-- `GET /admin/v1/users`
-  - Lists all users from Postgres
-- `GET /admin/v1/sessions`
-  - Lists all sessions from Postgres
-- `POST /admin/v1/broadcast` with JSON body: `{"message": { ... }}`
-  - Finds online users via Redis keys pattern `pcgb:gateway:user:*`
-  - Publishes one `gateway.send_to_user` envelope per online user on NATS subject `pcgb.gateway.send_to_user`
-
-Example:
-
-```bash
-export ADMIN_TOKEN=dev-admin-token
-
-curl -X POST http://localhost:8083/admin/v1/broadcast \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -d '{"message":{"type":"notice","text":"server restart in 5m"}}'
-```
-
-## Gateway WebSocket usage
-
-The `gateway` service listens on `:8080` and exposes:
-
-- `GET /v1/ws?token=<jwt>` for client WebSocket sessions
-- `POST /v1/send` for internal message push
-
-Quick test with `wscat`:
-
-```bash
-# TOKEN should be generated by login service (/v1/login)
-export TOKEN="<jwt>"
-
-# connect as the authenticated user
-wscat -c "ws://localhost:8080/v1/ws?token=${TOKEN}"
-```
-
-From another terminal, push a message to that user:
-
-```bash
-curl -X POST http://localhost:8080/v1/send \
-  -H 'Content-Type: application/json' \
-  -d '{"user_id":"<user-id>","message":{"type":"notice","text":"hello from gateway"}}'
-```
-
-You should see the JSON message printed in the connected `wscat` session.
-
-## Quality gates (commercial pass)
-
-Run the full local quality pass in this order:
-
-```bash
-gofmt -w $(git ls-files '*.go')
-go test ./...
-go test -tags=integration ./...
-golangci-lint run ./...
-go build ./...
-for d in cmd/*; do [ -d "$d" ] && go build "./$d"; done
-```
-
-Module hygiene:
-
-```bash
-go mod tidy
-```
-
-## Test tiers
-
-- Unit: `go test ./...`
-- Integration: `go test -tags=integration ./...`
-- E2E: `./scripts/test-e2e.sh`
-- Combined unit+integration (skip-aware when Docker is missing): `./scripts/test.sh`
-
-## Running locally
-
-1. `./scripts/env.sh`
-2. `make docker-up`
-3. `make migrate-up`
-4. Start services individually from `cmd/*` (or use `./scripts/local-demo.sh`).
-
-## Docker-unavailable environments (Codex/sandbox/limited CI)
-
-The repository intentionally **skips** Docker-dependent tiers with an explicit message instead of failing:
-
-- `./scripts/test.sh` skips integration tests when Docker CLI/daemon is unavailable.
-- `./scripts/test-e2e.sh` skips E2E when Docker CLI/daemon is unavailable.
-- `make docker-up` and `make docker-down` emit clear skip messages when Docker cannot be used.
-
+Suggested extension path:
+- add new bounded services under `cmd/`
+- reuse shared packages under `pkg/`
+- introduce new event subjects and handlers as features grow
+- keep local-first validation as your default development loop
